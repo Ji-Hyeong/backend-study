@@ -1,0 +1,15 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: transaction-lab
+  datasource:
+    url: jdbc:postgresql://localhost:5432/transaction_lab
+    username: lab
+    password: lab
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
