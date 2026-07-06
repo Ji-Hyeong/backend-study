@@ -1,4 +1,4 @@
-rootProject.name = "backend-interview-lab"
+rootProject.name = "backend-study-lab"
 
 include(
 	"apps:transaction-lab",
