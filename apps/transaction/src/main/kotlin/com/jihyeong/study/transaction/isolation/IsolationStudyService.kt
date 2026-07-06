@@ -2,6 +2,7 @@ package com.jihyeong.study.transaction.isolation
 
 import com.jihyeong.study.transaction.domain.StudyOrder
 import com.jihyeong.study.transaction.domain.StudyOrderRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
@@ -39,14 +40,20 @@ class IsolationStudyService(
 	): IsolationReadResult {
 		return template.execute {
 			val firstCount = orderRepository.countByProductName(productName)
+			log.info("외부 트랜잭션: 첫 번째 조회 productName={}, count={}", productName, firstCount)
 
 			newTransaction.execute {
+				log.info("REQUIRES_NEW 트랜잭션: productName={} 저장 후 커밋", productName)
 				orderRepository.save(StudyOrder(productName))
 			}
 
 			val secondCount = orderRepository.countByProductName(productName)
+			log.info("외부 트랜잭션: 두 번째 조회 productName={}, count={}", productName, secondCount)
 			IsolationReadResult(firstCount, secondCount)
 		}!!
 	}
-}
 
+	companion object {
+		private val log = LoggerFactory.getLogger(IsolationStudyService::class.java)
+	}
+}

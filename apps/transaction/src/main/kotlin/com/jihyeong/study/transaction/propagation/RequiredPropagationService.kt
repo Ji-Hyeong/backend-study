@@ -4,6 +4,7 @@ import com.jihyeong.study.transaction.domain.AuditLog
 import com.jihyeong.study.transaction.domain.AuditLogRepository
 import com.jihyeong.study.transaction.domain.StudyOrder
 import com.jihyeong.study.transaction.domain.StudyOrderRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -16,14 +17,21 @@ class RequiredPropagationService(
 
 	@Transactional
 	fun placeOrderAndFail(productName: String) {
+		log.info("외부 트랜잭션: 주문 저장 productName={}", productName)
 		orderRepository.save(StudyOrder(productName))
+		log.info("같은 Bean 호출: REQUIRED 감사 로그 메서드가 외부 트랜잭션에 참여")
 		saveAuditLog("required audit: $productName")
+		log.info("외부 트랜잭션: 예외 발생, REQUIRED 작업도 함께 롤백 예정")
 		throw IllegalStateException("outer transaction failed")
 	}
 
 	@Transactional(propagation = Propagation.REQUIRED)
 	fun saveAuditLog(message: String) {
+		log.info("REQUIRED 트랜잭션: 감사 로그 저장 message={}", message)
 		auditLogRepository.save(AuditLog(message))
 	}
-}
 
+	companion object {
+		private val log = LoggerFactory.getLogger(RequiredPropagationService::class.java)
+	}
+}

@@ -10,3 +10,12 @@ spring:
   h2:
     console:
       enabled: false
+
+logging:
+  level:
+    root: warn
+    transaction-study: info
+    com.jihyeong.study.transaction: info
+    org.springframework.test.context: warn
+    org.springframework.boot.test.context: warn
+    org.hibernate: warn
