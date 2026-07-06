@@ -11,11 +11,14 @@ import jakarta.persistence.Table
 @Table(name = "study_orders")
 class StudyOrder(
 	@Column(nullable = false)
-	val productName: String,
+	var productName: String,
 ) {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	val id: Long? = null
-}
 
+	fun rename(productName: String) {
+		this.productName = productName
+	}
+}

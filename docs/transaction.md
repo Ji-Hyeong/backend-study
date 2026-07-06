@@ -6,6 +6,8 @@
 - 전파 옵션 `REQUIRED`, `REQUIRES_NEW`, `NESTED`는 실패 전파가 어떻게 다른가?
 - 격리 수준에 따라 dirty read, non-repeatable read, phantom read가 어떻게 달라지는가?
 - checked exception과 unchecked exception의 rollback 기준은 어떻게 다른가?
+- `readOnly = true`는 쓰기를 막는 장치인가, flush 전략 힌트인가?
+- 트랜잭션 안에서 외부 API를 호출하면 어떤 불일치가 생기는가?
 
 ## 실험 계획
 
@@ -77,3 +79,94 @@
 - `UnexpectedRollbackException`은 “정상 커밋될 줄 알았지만 이미 롤백으로 결정된 상태”를 알려주는 예외다.
 - 감사 로그, 알림, 실패해도 본 작업을 살려야 하는 부가 작업은 트랜잭션 경계를 별도로 설계해야 한다.
 - 무조건 `REQUIRES_NEW`를 쓰는 것이 아니라, 본 작업과 부가 작업의 성공/실패 결합도를 먼저 결정해야 한다.
+
+## 3. Propagation
+
+### 학습 질문
+
+`REQUIRED`와 `REQUIRES_NEW`는 외부 트랜잭션이 실패할 때 커밋/롤백 범위가 어떻게 달라지는가?
+
+### 코드 위치
+
+- `REQUIRED`: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/propagation/RequiredPropagationService.kt`
+- `REQUIRES_NEW`: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/propagation/RequiresNewPropagationService.kt`
+- 테스트: `apps/transaction/src/test/kotlin/com/jihyeong/study/transaction/propagation/PropagationTransactionTests.kt`
+
+### 복기 포인트
+
+- `REQUIRED`는 기존 트랜잭션이 있으면 참여하므로 외부 롤백과 함께 롤백된다.
+- `REQUIRES_NEW`는 기존 트랜잭션을 잠시 중단하고 새 트랜잭션을 시작한다.
+- 부가 작업이 본 작업과 성공/실패를 같이해야 하면 `REQUIRED`, 독립적으로 남아야 하면 별도 트랜잭션을 검토한다.
+- `REQUIRES_NEW`는 커넥션을 추가로 점유할 수 있으므로 남용하면 커넥션 풀 압박이 생길 수 있다.
+
+## 4. Rollback Rules
+
+### 학습 질문
+
+Spring의 기본 롤백 규칙에서 runtime exception과 checked exception은 어떻게 다르게 처리되는가?
+
+### 코드 위치
+
+- 예제: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/rollbackrules/RollbackRuleService.kt`
+- 테스트: `apps/transaction/src/test/kotlin/com/jihyeong/study/transaction/rollbackrules/RollbackRuleTransactionTests.kt`
+
+### 복기 포인트
+
+- 기본적으로 `RuntimeException`과 `Error`는 롤백 대상이다.
+- checked exception은 기본 롤백 대상이 아니어서 메서드 밖으로 던져져도 커밋될 수 있다.
+- checked exception까지 롤백하려면 `rollbackFor`를 명시한다.
+- 비즈니스 예외를 checked로 둘지 runtime으로 둘지는 트랜잭션 정책과 함께 결정해야 한다.
+
+## 5. Read Only
+
+### 학습 질문
+
+`@Transactional(readOnly = true)` 안에서 엔티티를 변경하면 DB 쓰기가 항상 차단되는가?
+
+### 코드 위치
+
+- 예제: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/readonly/ReadOnlyOrderService.kt`
+- 테스트: `apps/transaction/src/test/kotlin/com/jihyeong/study/transaction/readonly/ReadOnlyTransactionTests.kt`
+
+### 복기 포인트
+
+- readOnly는 주로 flush mode와 조회 최적화를 위한 힌트다.
+- Hibernate 환경에서는 readOnly 트랜잭션의 dirty checking 변경이 flush 되지 않을 수 있다.
+- readOnly가 DB 레벨 쓰기 방지 정책을 완전히 보장한다고 생각하면 위험하다.
+- 조회 메서드에는 의도를 드러내기 위해 readOnly를 붙이되, 쓰기 방어는 권한/계층/DB 제약과 함께 설계해야 한다.
+
+## 6. Isolation
+
+### 학습 질문
+
+`READ_COMMITTED`와 `REPEATABLE_READ`는 같은 트랜잭션 안에서 다시 읽을 때 어떤 차이를 만드는가?
+
+### 코드 위치
+
+- 예제: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/isolation/IsolationStudyService.kt`
+- 테스트: `apps/transaction/src/test/kotlin/com/jihyeong/study/transaction/isolation/IsolationTransactionTests.kt`
+
+### 복기 포인트
+
+- `READ_COMMITTED`는 다른 트랜잭션이 커밋한 데이터를 다음 조회에서 볼 수 있다.
+- `REPEATABLE_READ`는 트랜잭션 시작 시점의 조회 스냅샷을 유지해 같은 조건의 재조회 결과가 바뀌지 않도록 한다.
+- 격리 수준은 DB 구현에 따라 세부 동작이 다를 수 있으므로 사용하는 DB 기준으로 확인해야 한다.
+- 격리 수준만으로 모든 동시성 문제가 해결되지는 않으며, 락/버전/유니크 제약과 함께 설계해야 한다.
+
+## 7. External I/O
+
+### 학습 질문
+
+DB 트랜잭션 안에서 결제 API나 메시지 발행 같은 외부 I/O를 호출하면 어떤 문제가 생기는가?
+
+### 코드 위치
+
+- 예제: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/externalio/ExternalIoOrderService.kt`
+- 테스트: `apps/transaction/src/test/kotlin/com/jihyeong/study/transaction/externalio/ExternalIoTransactionTests.kt`
+
+### 복기 포인트
+
+- DB 트랜잭션 롤백은 이미 호출된 외부 시스템의 상태를 되돌리지 못한다.
+- 외부 호출 성공 후 DB 커밋이 실패하면 결제는 됐지만 주문은 없는 상태가 생길 수 있다.
+- 반대로 DB 커밋 후 외부 호출이 실패하면 주문은 있지만 결제/메시지는 없는 상태가 생길 수 있다.
+- 이런 불일치를 줄이려면 Outbox, 상태 기반 재시도, 보상 트랜잭션, 멱등성 키를 함께 고려한다.
