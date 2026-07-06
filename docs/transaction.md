@@ -44,3 +44,36 @@
 - 같은 객체 내부의 `this.method()` 호출은 프록시를 우회한다.
 - 해결책은 서비스 분리, 자기 프록시 주입, `TransactionTemplate` 사용 등이 있다.
 - 트랜잭션 경계는 어노테이션 위치가 아니라 실제 호출 경로 기준으로 판단해야 한다.
+
+## 2. Rollback Only
+
+### 학습 질문
+
+내부 트랜잭션에서 발생한 예외를 외부 메서드가 catch 했는데도 왜 최종 커밋 시 `UnexpectedRollbackException`이 발생하는가?
+
+### 코드 위치
+
+- 실패 재현: `apps/transaction-lab/src/main/kotlin/com/jihyeong/lab/transaction/rollbackonly/RollbackOnlyOrderService.kt`
+- 개선 예제: `apps/transaction-lab/src/main/kotlin/com/jihyeong/lab/transaction/rollbackonly/RequiresNewOrderService.kt`
+- 테스트: `apps/transaction-lab/src/test/kotlin/com/jihyeong/lab/transaction/rollbackonly/RollbackOnlyTransactionTests.kt`
+
+### 재현 시나리오
+
+1. 주문 저장 메서드는 외부 트랜잭션을 시작한다.
+2. 감사 로그 저장 메서드는 기본 전파 옵션인 `REQUIRED`로 같은 트랜잭션에 참여한다.
+3. 감사 로그 저장 중 `RuntimeException`이 발생한다.
+4. 외부 메서드는 예외를 catch 하고 정상 종료하려고 한다.
+
+내부 메서드의 트랜잭션 advice는 `RuntimeException`을 보고 현재 트랜잭션을 rollback-only로 표시한다. 외부 메서드가 예외를 catch 하더라도 트랜잭션 상태는 되돌아가지 않는다. 그래서 외부 메서드가 정상 반환되어도 커밋 시점에 `UnexpectedRollbackException`이 발생한다.
+
+### 개선 방향
+
+실패해도 본 작업을 롤백시키지 않아야 하는 부가 작업은 `REQUIRES_NEW` 같은 별도 트랜잭션으로 분리한다. 이 경우 부가 작업은 자기 트랜잭션만 롤백하고, 외부 주문 트랜잭션은 rollback-only로 오염되지 않아 커밋될 수 있다.
+
+### 복기 포인트
+
+- 예외를 catch 하는 것과 트랜잭션 rollback-only 상태는 별개다.
+- 같은 `REQUIRED` 트랜잭션에 참여한 내부 작업 실패는 전체 트랜잭션을 rollback-only로 만들 수 있다.
+- `UnexpectedRollbackException`은 “정상 커밋될 줄 알았지만 이미 롤백으로 결정된 상태”를 알려주는 예외다.
+- 감사 로그, 알림, 실패해도 본 작업을 살려야 하는 부가 작업은 트랜잭션 경계를 별도로 설계해야 한다.
+- 무조건 `REQUIRES_NEW`를 쓰는 것이 아니라, 본 작업과 부가 작업의 성공/실패 결합도를 먼저 결정해야 한다.
