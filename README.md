@@ -37,6 +37,8 @@ docker compose -f docker/docker-compose.yml up -d
 ./gradlew :apps:auth-lab:bootRun
 ```
 
+`transaction-lab`은 가볍게 실행할 수 있도록 기본 DB로 H2 인메모리 모드를 사용합니다. 실행 후 `/h2-console`에서 JDBC URL `jdbc:h2:mem:transaction_lab`로 접속할 수 있습니다.
+
 ## Test
 
 ```bash
@@ -52,4 +54,3 @@ docker compose -f docker/docker-compose.yml up -d
 3. 왜 실패하는지 트랜잭션, 락, 캐시, 토큰 경계로 설명한다.
 4. 개선한 코드를 추가한다.
 5. 운영에서 조심할 점을 짧게 정리한다.
-

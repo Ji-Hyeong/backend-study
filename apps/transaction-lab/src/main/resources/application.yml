@@ -5,11 +5,14 @@ spring:
   application:
     name: transaction-lab
   datasource:
-    url: jdbc:postgresql://localhost:5432/transaction_lab
-    username: lab
-    password: lab
+    url: jdbc:h2:mem:transaction_lab;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     open-in-view: false
-
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
