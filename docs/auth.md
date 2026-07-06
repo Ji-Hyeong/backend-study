@@ -1,4 +1,4 @@
-# Auth Lab
+# Auth
 
 ## 학습 질문
 

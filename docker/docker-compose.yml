@@ -1,10 +1,10 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: backend-lab-postgres
+    container_name: backend-study-postgres
     environment:
-      POSTGRES_USER: lab
-      POSTGRES_PASSWORD: lab
+      POSTGRES_USER: study
+      POSTGRES_PASSWORD: study
     ports:
       - "5432:5432"
     volumes:
@@ -12,7 +12,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: backend-lab-redis
+    container_name: backend-study-redis
     ports:
       - "6379:6379"
 

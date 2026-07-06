@@ -1,3 +1,3 @@
-CREATE DATABASE transaction_lab;
-CREATE DATABASE concurrency_lab;
+CREATE DATABASE transaction_study;
+CREATE DATABASE concurrency_study;
 

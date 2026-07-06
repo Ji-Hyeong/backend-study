@@ -1,4 +1,4 @@
-# Concurrency Lab
+# Concurrency
 
 ## 학습 질문
 

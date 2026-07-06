@@ -1,4 +1,4 @@
-# Cache Lab
+# Cache
 
 ## 학습 질문
 

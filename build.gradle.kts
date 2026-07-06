@@ -12,7 +12,7 @@ plugins {
 }
 
 allprojects {
-	group = "com.jihyeong.lab"
+	group = "com.jihyeong.study"
 	version = "0.0.1-SNAPSHOT"
 
 	repositories {

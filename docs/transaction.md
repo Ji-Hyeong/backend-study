@@ -1,4 +1,4 @@
-# Transaction Lab
+# Transaction
 
 ## 학습 질문
 
@@ -21,9 +21,9 @@
 
 ### 코드 위치
 
-- 실패 재현: `apps/transaction-lab/src/main/kotlin/com/jihyeong/lab/transaction/selfinvocation/SelfInvocationOrderService.kt`
-- 개선 예제: `apps/transaction-lab/src/main/kotlin/com/jihyeong/lab/transaction/selfinvocation/SeparatedOrderService.kt`
-- 테스트: `apps/transaction-lab/src/test/kotlin/com/jihyeong/lab/transaction/selfinvocation/SelfInvocationTransactionTests.kt`
+- 실패 재현: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/selfinvocation/SelfInvocationOrderService.kt`
+- 개선 예제: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/selfinvocation/SeparatedOrderService.kt`
+- 테스트: `apps/transaction/src/test/kotlin/com/jihyeong/study/transaction/selfinvocation/SelfInvocationTransactionTests.kt`
 
 ### 재현 시나리오
 
@@ -53,9 +53,9 @@
 
 ### 코드 위치
 
-- 실패 재현: `apps/transaction-lab/src/main/kotlin/com/jihyeong/lab/transaction/rollbackonly/RollbackOnlyOrderService.kt`
-- 개선 예제: `apps/transaction-lab/src/main/kotlin/com/jihyeong/lab/transaction/rollbackonly/RequiresNewOrderService.kt`
-- 테스트: `apps/transaction-lab/src/test/kotlin/com/jihyeong/lab/transaction/rollbackonly/RollbackOnlyTransactionTests.kt`
+- 실패 재현: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/rollbackonly/RollbackOnlyOrderService.kt`
+- 개선 예제: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/rollbackonly/RequiresNewOrderService.kt`
+- 테스트: `apps/transaction/src/test/kotlin/com/jihyeong/study/transaction/rollbackonly/RollbackOnlyTransactionTests.kt`
 
 ### 재현 시나리오
 

@@ -1,8 +1,8 @@
-rootProject.name = "backend-study-lab"
+rootProject.name = "backend-study"
 
 include(
-	"apps:transaction-lab",
-	"apps:concurrency-lab",
-	"apps:cache-lab",
-	"apps:auth-lab",
+	"apps:transaction",
+	"apps:concurrency",
+	"apps:cache",
+	"apps:auth",
 )
