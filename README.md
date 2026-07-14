@@ -9,7 +9,7 @@ Kotlin 기반 백엔드 스터디용 모노레포입니다.
 | Module | Port | Focus |
 | --- | ---: | --- |
 | `apps:transaction` | 8081 | 트랜잭션 전파, 격리 수준, rollback 경계 |
-| `apps:concurrency` | 8082 | 낙관적 락, 비관적 락, Redis lock, 멱등성 |
+| `apps:concurrency` | 8082 | lost update, JVM/DB/Redis 락, 낙관적 락 재시도 |
 | `apps:cache` | 8083 | cache-aside, TTL, stampede, stale data |
 | `apps:auth` | 8084 | JWT, refresh token rotation, RBAC, 인가 경계 |
 
@@ -37,7 +37,7 @@ docker compose -f docker/docker-compose.yml up -d
 ./gradlew :apps:auth:bootRun
 ```
 
-`transaction`은 가볍게 실행할 수 있도록 기본 DB로 H2 인메모리 모드를 사용합니다. 실행 후 `/h2-console`에서 JDBC URL `jdbc:h2:mem:transaction_study`로 접속할 수 있습니다.
+`transaction`과 `concurrency`는 가볍게 실행할 수 있도록 기본 DB로 H2 인메모리 모드를 사용합니다. Redis 분산 락 예제만 Redis가 필요하며, 실행 후 `/h2-console`에서 각각 `jdbc:h2:mem:transaction_study`, `jdbc:h2:mem:concurrency_study`로 접속할 수 있습니다.
 
 ## Test
 

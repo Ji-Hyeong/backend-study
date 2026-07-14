@@ -5,15 +5,16 @@ spring:
   application:
     name: concurrency
   datasource:
-    url: jdbc:postgresql://localhost:5432/concurrency_study
-    username: study
-    password: study
+    url: jdbc:h2:mem:concurrency_study;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    hikari:
+      maximum-pool-size: 25
   data:
     redis:
       host: localhost
       port: 6379
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     open-in-view: false
-
