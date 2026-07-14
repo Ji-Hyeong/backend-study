@@ -11,7 +11,7 @@ Kotlin 기반 백엔드 스터디용 모노레포입니다.
 | `apps:transaction` | 8081 | 트랜잭션 전파, 격리 수준, rollback 경계 |
 | `apps:concurrency` | 8082 | lost update, JVM/DB/Redis 락, 낙관적 락 재시도 |
 | `apps:cache` | 8083 | Cache-Aside, stampede, stale data, negative caching |
-| `apps:auth` | 8084 | JWT, refresh token rotation, RBAC, 인가 경계 |
+| `apps:auth` | 8084 | JWT, refresh token rotation, RBAC, resource owner |
 
 ## Stack
 
@@ -37,7 +37,7 @@ docker compose -f docker/docker-compose.yml up -d
 ./gradlew :apps:auth:bootRun
 ```
 
-`transaction`과 `concurrency`는 가볍게 실행할 수 있도록 기본 DB로 H2 인메모리 모드를 사용합니다. `cache`의 런타임 Cache-Aside 예제와 `concurrency`의 Redis 분산 락 예제는 Redis가 필요하며, 실행 후 `/h2-console`에서 각각 `jdbc:h2:mem:transaction_study`, `jdbc:h2:mem:concurrency_study`로 접속할 수 있습니다.
+`transaction`과 `concurrency`는 가볍게 실행할 수 있도록 기본 DB로 H2 인메모리 모드를 사용합니다. `cache`의 런타임 Cache-Aside 예제, `concurrency`의 Redis 분산 락 예제, `auth`의 refresh token 저장소는 Redis가 필요하며, 실행 후 `/h2-console`에서 각각 `jdbc:h2:mem:transaction_study`, `jdbc:h2:mem:concurrency_study`로 접속할 수 있습니다.
 
 ## Test
 

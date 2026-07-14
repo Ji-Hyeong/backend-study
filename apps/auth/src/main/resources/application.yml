@@ -4,4 +4,15 @@ server:
 spring:
   application:
     name: auth
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
+auth:
+  jwt:
+    secret: ${AUTH_JWT_SECRET:backend-study-auth-signing-secret-must-be-long-enough}
+
+study:
+  auth:
+    refresh-token-store: redis

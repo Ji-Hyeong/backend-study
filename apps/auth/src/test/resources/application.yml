@@ -1,0 +1,12 @@
+study:
+  auth:
+    refresh-token-store: memory
+
+auth:
+  jwt:
+    secret: test-auth-signing-secret-must-be-long-enough-for-hmac
+
+logging:
+  level:
+    auth-study: INFO
+    com.jihyeong.study.auth: INFO
