@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
@@ -27,6 +28,8 @@ import org.springframework.web.filter.OncePerRequestFilter
 @EnableMethodSecurity
 class SecurityConfiguration(
 	private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+	private val keycloakJwtAuthenticationConverter: KeycloakJwtAuthenticationConverter,
+	@Value("\${study.auth.authentication-provider:local}") private val authenticationProvider: String,
 ) {
 
 	@Bean
@@ -41,8 +44,19 @@ class SecurityConfiguration(
 					.requestMatchers("/api/admin/**").hasRole("ADMIN")
 					.anyRequest().authenticated()
 			}
-			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+
+		if (authenticationProvider == KEYCLOAK_PROVIDER) {
+			http.oauth2ResourceServer { oauth2 ->
+				oauth2.jwt { jwt -> jwt.jwtAuthenticationConverter(keycloakJwtAuthenticationConverter) }
+			}
+		} else {
+			http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+		}
 		return http.build()
+	}
+
+	private companion object {
+		const val KEYCLOAK_PROVIDER = "keycloak"
 	}
 }
 

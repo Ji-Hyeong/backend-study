@@ -31,8 +31,9 @@ class AuthAuthorizationTests {
 		AuthStudyLogger.step(1, "USER access token으로 내 정보 경로를 호출한다.")
 		mockMvc.perform(get("/api/me").header(HttpHeaders.AUTHORIZATION, "Bearer $userToken"))
 			.andExpect(status().isOk)
+			.andExpect(jsonPath("$.subject").value("201"))
 			.andExpect(jsonPath("$.userId").value(201))
-			.andExpect(jsonPath("$.role").value("USER"))
+			.andExpect(jsonPath("$.roles[0]").value("USER"))
 
 		AuthStudyLogger.step(2, "같은 token으로 ADMIN 경로를 호출하면 403을 반환한다.")
 		mockMvc.perform(get("/api/admin/reports").header(HttpHeaders.AUTHORIZATION, "Bearer $userToken"))

@@ -15,4 +15,6 @@ auth:
 
 study:
   auth:
+    # local은 이 저장소의 HMAC JWT를, keycloak은 OIDC issuer의 서명 키를 검증한다.
+    authentication-provider: local
     refresh-token-store: redis

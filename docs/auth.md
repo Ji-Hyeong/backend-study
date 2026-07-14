@@ -6,7 +6,9 @@
 - JWT는 서버 조회를 줄이지만 즉시 폐기 문제를 왜 남기는가?
 - refresh token rotation은 재사용 공격을 어떻게 탐지하고, 재사용 뒤에는 왜 전체 세션을 폐기하는가?
 - 여러 서버가 동시에 같은 refresh token을 받으면 왜 저장소의 원자적 소비가 필요한가?
-- 인증과 RBAC, resource owner 검증은 각각 어느 경계에서 처리하는가?
+- OIDC에서 authorization server, client, resource server는 어떤 책임으로 나뉘는가?
+- Keycloak의 issuer, realm role, client role, custom claim은 API에서 어떻게 검증하고 매핑하는가?
+- RBAC, ReBAC, ABAC은 어떤 권한 입력을 사용하며 각각 어디까지 확장 가능한가?
 
 ## 토큰 발급과 회전 예제
 
@@ -17,6 +19,8 @@
 | Reuse Detection | `RefreshTokenStore.rotate` | 이미 USED 상태인 이전 refresh token의 재사용을 감지하면 해당 사용자의 모든 refresh token을 REVOKED로 바꾼다. |
 | 동시 Refresh | 메모리 저장소와 Redis Lua script | 이전 token 소비와 다음 token 저장까지 원자적으로 처리해 하나의 요청만 성공한다. |
 | RBAC | `JwtAuthenticationFilter`, `/api/admin/**` | USER token은 `/api/me`에는 접근하지만 admin 경로에서는 403을 받는다. |
+| ReBAC | `ProjectRelationshipPolicy` | 프로젝트에 맺은 OWNER, EDITOR, VIEWER 관계로 읽기와 수정 가능 여부를 계산한다. |
+| ABAC | `DocumentAttributePolicy` | 부서, 보안 등급, 재직 상태, 사내망 여부를 함께 평가한다. |
 | Resource Owner | `/api/orders/{ownerId}` | USER는 본인 주문만, ADMIN은 모든 주문을 조회한다. |
 
 `AuthService.login`은 이미 자격 증명 검증이 끝났다고 가정하고 토큰 발급 이후만 다룹니다. 비밀번호 해싱과 로그인 실패 제한을 섞지 않아, 이 모듈에서는 토큰 수명과 인가 경계를 집중해서 볼 수 있습니다.
@@ -30,6 +34,31 @@
 rotation 테스트에서는 이전 token의 소비와 새 `refreshTokenId` 저장이 같은 `rotate` 연산에서 끝납니다. 이전 token을 다시 보내면 `REUSED` 상태를 보고 `사용자 refresh token 전체 폐기` 로그가 남습니다. 이때 새로 발급받은 refresh token도 사용할 수 없어야 합니다.
 
 동시 refresh 테스트에서는 두 요청 중 하나만 `CONSUMED`로 전이됩니다. 다른 요청은 재사용으로 감지되고 세션을 폐기합니다. 메모리 저장소는 단일 인스턴스에서 동기화하고, Redis 저장소는 Lua script로 상태 전이를 원자화합니다.
+
+`AuthorizationPolicyTests`는 같은 요구를 서로 다른 입력으로 판단하는 과정을 로그로 남깁니다. ReBAC은 역할이 아니라 `사용자 - 프로젝트 - 관계`를, ABAC은 `주체 - 리소스 - 환경`의 속성을 입력으로 삼습니다. RBAC은 단순하고 운영하기 쉽지만, 조직·프로젝트별 관계와 시간·네트워크·보안등급 조건이 늘어나면 ReBAC 또는 ABAC의 경계를 따로 두는 편이 명확합니다.
+
+## OIDC와 Keycloak
+
+OIDC는 OAuth 2.0 위에서 사용자 인증 결과를 ID Token과 UserInfo로 전달하는 계층입니다. 이 모듈에서 Keycloak은 authorization server, `apps:auth`는 resource server 역할을 맡습니다. API는 사용자의 비밀번호를 직접 검증하지 않고 issuer의 공개 키로 access token 서명, `iss`, `exp`를 검증합니다.
+
+기본 `local` 모드는 이 저장소의 HMAC JWT 필터를 사용합니다. `keycloak` 프로필은 Spring Security resource server로 전환하고, `KeycloakJwtAuthenticationConverter`가 `realm_access.roles`와 `resource_access.*.roles`를 `ROLE_*` authority로 바꿉니다. OIDC의 `sub`는 일반적으로 문자열 식별자이므로, 도메인 숫자 식별자가 필요한 소유자 검증에는 `study_user_id` custom claim을 별도로 사용합니다.
+
+```bash
+docker compose -f docker/docker-compose.yml up -d keycloak
+./gradlew :apps:auth:bootRun --args='--spring.profiles.active=keycloak'
+```
+
+로컬 Keycloak은 `http://localhost:8085`에서 열립니다. realm import에는 `backend-study-api` client와 `study-user`/`study-admin` 사용자가 들어 있습니다. 빠른 관찰을 위해 Direct Access Grant를 열어 두었지만, 이는 학습 전용입니다. 브라우저·모바일 로그인에는 authorization code + PKCE를 사용하고, 서버 간 호출에는 client credentials를 별도 client로 구성해야 합니다.
+
+```bash
+curl --request POST 'http://localhost:8085/realms/backend-study/protocol/openid-connect/token' \
+  --data-urlencode 'client_id=backend-study-api' \
+  --data-urlencode 'grant_type=password' \
+  --data-urlencode 'username=study-user' \
+  --data-urlencode 'password=study-user'
+```
+
+반환받은 `access_token`으로 `/api/me`, `/api/admin/reports`, `/api/orders/301`을 호출해 claim과 authority 변환 결과를 비교합니다. Realm import는 기존 realm이 있으면 다시 덮어쓰지 않으므로, JSON을 수정해 다시 관찰하려면 `docker compose -f docker/docker-compose.yml down -v` 뒤에 다시 올립니다.
 
 ## Redis 실행 메모
 

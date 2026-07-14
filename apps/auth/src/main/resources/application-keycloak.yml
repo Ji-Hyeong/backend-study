@@ -1,0 +1,12 @@
+study:
+  auth:
+    authentication-provider: keycloak
+    keycloak:
+      issuer-uri: http://localhost:8085/realms/backend-study
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${study.auth.keycloak.issuer-uri}
