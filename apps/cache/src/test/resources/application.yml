@@ -1,0 +1,12 @@
+spring:
+  cache:
+    type: none
+
+study:
+  cache:
+    storage: memory
+
+logging:
+  level:
+    cache-study: INFO
+    com.jihyeong.study.cache: INFO
