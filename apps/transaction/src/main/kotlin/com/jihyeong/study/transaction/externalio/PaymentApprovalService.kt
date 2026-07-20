@@ -24,14 +24,29 @@ class PaymentApprovalService(
 
 		val result = try {
 			log.info("커밋된 주문 상태 후 원격 PG 승인 호출: orderId={}, paymentKey={}", orderId, paymentKey)
-			paymentGateway.confirm(PaymentApprovalCommand(paymentKey, orderId, amount))
+			paymentGateway.confirm(
+				PaymentApprovalCommand(
+					paymentKey = paymentKey,
+					orderId = orderId,
+					amount = amount,
+					// 같은 주문의 승인 재시도는 같은 PG 멱등 키를 사용해야 중복 승인되지 않는다.
+					idempotencyKey = "confirm-$orderId",
+				),
+			)
 		} catch (exception: PaymentGatewayUnavailableException) {
 			log.warn("원격 PG 응답 미수신, 실패로 단정하지 않음: orderId={}", orderId)
 			return paymentOrderStateService.recordUnknown(orderId)
 		}
 
 		return when (result) {
-			is PaymentApprovalResult.Approved -> paymentOrderStateService.recordApproved(orderId, result.paymentKey)
+			is PaymentApprovalResult.Approved -> {
+				if (result.paymentKey != paymentKey || result.orderId != orderId || result.amount != amount) {
+					log.error("PG 승인 응답과 주문이 일치하지 않음: orderId={}, paymentKey={}", orderId, paymentKey)
+					paymentOrderStateService.recordUnknown(orderId)
+				} else {
+					paymentOrderStateService.recordApproved(orderId, result.paymentKey)
+				}
+			}
 			is PaymentApprovalResult.Declined -> paymentOrderStateService.recordDeclined(orderId, result.code)
 		}
 	}

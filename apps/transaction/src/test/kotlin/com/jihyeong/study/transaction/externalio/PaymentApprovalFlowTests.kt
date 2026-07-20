@@ -94,4 +94,23 @@ class PaymentApprovalFlowTests @Autowired constructor(
 		assertThat(unchanged.status).isEqualTo(PaymentOrderStatus.PENDING_PAYMENT)
 		assertThat(paymentGateway.activeTransactionDuringConfirm).isNull()
 	}
+
+	@Test
+	fun `PG 승인 응답의 주문 정보가 다르면 paid로 전이하지 않고 unknown으로 남긴다`() {
+		scenario("Payment approval response validation")
+		step(1, "PG가 다른 paymentKey로 승인 응답을 반환하는 상황을 재현한다.")
+		val order = paymentApprovalService.createOrder("Kotlin in Action", 15_000)
+		paymentGateway.nextApprovalResult = PaymentApprovalResult.Approved(
+			paymentKey = "another-payment-key",
+			orderId = order.orderId,
+			amount = order.amount,
+		)
+
+		step(2, "주문과 응답이 일치하지 않으면 결제 성공으로 단정하지 않는다.")
+		val result = paymentApprovalService.confirm(order.orderId, "payment-key-4", order.amount)
+
+		state("status={}, paymentKey={}", result.status, result.paymentKey ?: "none")
+		assertThat(result.status).isEqualTo(PaymentOrderStatus.PAYMENT_UNKNOWN)
+		assertThat(result.paymentKey).isEqualTo("payment-key-4")
+	}
 }

@@ -4,10 +4,15 @@ data class PaymentApprovalCommand(
 	val paymentKey: String,
 	val orderId: String,
 	val amount: Long,
+	val idempotencyKey: String,
 )
 
 sealed interface PaymentApprovalResult {
-	data class Approved(val paymentKey: String) : PaymentApprovalResult
+	data class Approved(
+		val paymentKey: String,
+		val orderId: String,
+		val amount: Long,
+	) : PaymentApprovalResult
 	data class Declined(val code: String) : PaymentApprovalResult
 }
 
@@ -21,6 +26,7 @@ sealed interface PaymentLookupResult {
 data class PaymentCancellationCommand(
 	val paymentKey: String,
 	val cancelReason: String,
+	val idempotencyKey: String,
 )
 
 sealed interface PaymentCancellationResult {

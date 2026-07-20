@@ -16,3 +16,10 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+study:
+  payment:
+    toss:
+      enabled: false
+      base-url: https://api.tosspayments.com
+      secret-key: ${STUDY_PAYMENT_TOSS_SECRET_KEY:}

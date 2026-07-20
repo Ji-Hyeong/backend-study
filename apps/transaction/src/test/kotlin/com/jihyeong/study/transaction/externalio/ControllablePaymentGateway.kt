@@ -13,6 +13,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 class ControllablePaymentGateway : PaymentGateway {
 
 	var nextConfirmation: PaymentConfirmation = PaymentConfirmation.Approved
+	var nextApprovalResult: PaymentApprovalResult? = null
 	var activeTransactionDuringConfirm: Boolean? = null
 	var nextCancellation: PaymentCancellation = PaymentCancellation.Canceled
 	var activeTransactionDuringCancel: Boolean? = null
@@ -20,10 +21,11 @@ class ControllablePaymentGateway : PaymentGateway {
 
 	override fun confirm(command: PaymentApprovalCommand): PaymentApprovalResult {
 		activeTransactionDuringConfirm = TransactionSynchronizationManager.isActualTransactionActive()
+		nextApprovalResult?.let { return it }
 		return when (val confirmation = nextConfirmation) {
 			PaymentConfirmation.Approved -> {
 				lookupResults[command.paymentKey] = PaymentLookupResult.Approved(command.paymentKey, command.orderId, command.amount)
-				PaymentApprovalResult.Approved(command.paymentKey)
+					PaymentApprovalResult.Approved(command.paymentKey, command.orderId, command.amount)
 			}
 			is PaymentConfirmation.Declined -> PaymentApprovalResult.Declined(confirmation.code)
 			PaymentConfirmation.Unavailable -> throw PaymentGatewayUnavailableException("PG connection timed out")
@@ -51,6 +53,7 @@ class ControllablePaymentGateway : PaymentGateway {
 
 	fun clear() {
 		nextConfirmation = PaymentConfirmation.Approved
+		nextApprovalResult = null
 		activeTransactionDuringConfirm = null
 		nextCancellation = PaymentCancellation.Canceled
 		activeTransactionDuringCancel = null

@@ -24,7 +24,14 @@ class PaymentCancellationService(
 
 		return try {
 			log.info("커밋된 취소 요청 후 원격 PG 취소 호출: orderId={}, paymentKey={}", orderId, paymentKey)
-			val result = paymentGateway.cancel(PaymentCancellationCommand(paymentKey, cancelReason))
+			val result = paymentGateway.cancel(
+				PaymentCancellationCommand(
+					paymentKey = paymentKey,
+					cancelReason = cancelReason,
+					// 재시도 작업도 처음 취소 요청과 동일한 키를 전달한다.
+					idempotencyKey = "cancel-$orderId",
+				),
+			)
 			when (result) {
 				is PaymentCancellationResult.Canceled -> paymentOrderStateService.recordCanceled(orderId, result.paymentKey)
 			}
