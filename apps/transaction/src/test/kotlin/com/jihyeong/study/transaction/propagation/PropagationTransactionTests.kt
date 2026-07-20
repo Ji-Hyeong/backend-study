@@ -7,6 +7,7 @@ import com.jihyeong.study.transaction.support.StudyStepLogger.state
 import com.jihyeong.study.transaction.support.StudyStepLogger.step
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
@@ -59,7 +60,8 @@ class PropagationTransactionTests @Autowired constructor(
 	}
 
 	@Test
-	fun `supports 는 트랜잭션이 없으면 새 트랜잭션을 만들지 않고 호출 흐름을 따른다`() {
+	@DisplayName("supports 는 트랜잭션이 없으면 새 트랜잭션을 만들지 않고 호출 흐름을 따른다")
+	fun supportsWithoutTransactionFollowsCallerFlow() {
 		scenario("Propagation - SUPPORTS without transaction")
 		step(1, "트랜잭션이 없는 서비스 메서드에서 SUPPORTS 감사 로그 저장을 호출한다.")
 		assertThrows<IllegalStateException> {

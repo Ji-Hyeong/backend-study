@@ -7,6 +7,7 @@ import com.jihyeong.study.transaction.support.StudyStepLogger.state
 import com.jihyeong.study.transaction.support.StudyStepLogger.step
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
@@ -28,7 +29,8 @@ class RollbackOnlyTransactionTests @Autowired constructor(
 	}
 
 	@Test
-	fun `내부 required 트랜잭션 예외를 잡아도 외부 트랜잭션은 rollback only 상태로 남는다`() {
+	@DisplayName("내부 required 트랜잭션 예외를 잡아도 외부 트랜잭션은 rollback only 상태로 남는다")
+	fun caughtRequiredFailureKeepsOuterTransactionRollbackOnly() {
 		scenario("Rollback Only - REQUIRED 내부 실패")
 		step(1, "외부 트랜잭션에서 주문을 저장한 뒤 REQUIRED 감사 로그 저장을 호출한다.")
 		assertThrows<UnexpectedRollbackException> {

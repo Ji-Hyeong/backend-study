@@ -7,6 +7,7 @@ import com.jihyeong.study.transaction.support.StudyStepLogger.state
 import com.jihyeong.study.transaction.support.StudyStepLogger.step
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
@@ -27,7 +28,8 @@ class SelfInvocationTransactionTests @Autowired constructor(
 	}
 
 	@Test
-	fun `같은 클래스 내부 호출은 transactional proxy 를 거치지 않아 requires new 가 적용되지 않는다`() {
+	@DisplayName("같은 클래스 내부 호출은 transactional proxy 를 거치지 않아 requires new 가 적용되지 않는다")
+	fun directInternalCallDoesNotApplyRequiresNew() {
 		scenario("Self Invocation - 같은 클래스 내부 호출")
 		step(1, "외부 주문 트랜잭션을 시작하고, 같은 객체의 REQUIRES_NEW 메서드를 직접 호출한다.")
 		assertThrows<IllegalStateException> {
@@ -42,7 +44,8 @@ class SelfInvocationTransactionTests @Autowired constructor(
 	}
 
 	@Test
-	fun `별도 서비스로 분리하면 requires new 감사 로그는 외부 트랜잭션 롤백 후에도 커밋된다`() {
+	@DisplayName("별도 서비스로 분리하면 requires new 감사 로그는 외부 트랜잭션 롤백 후에도 커밋된다")
+	fun separateBeanAppliesRequiresNew() {
 		scenario("Self Invocation - 별도 Bean 호출")
 		step(1, "외부 주문 트랜잭션에서 별도 Bean의 REQUIRES_NEW 감사 로그 메서드를 호출한다.")
 		assertThrows<IllegalStateException> {
