@@ -12,10 +12,11 @@ import jakarta.persistence.Table
 class AuditLog(
 	@Column(nullable = false)
 	val message: String,
+	@Column(name = "event_id", unique = true)
+	val eventId: String? = null,
 ) {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	val id: Long? = null
 }
-

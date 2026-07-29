@@ -8,6 +8,8 @@
 - checked exception과 unchecked exception의 rollback 기준은 어떻게 다른가?
 - `readOnly = true`는 쓰기를 막는 장치인가, flush 전략 힌트인가?
 - 트랜잭션 안에서 외부 API를 호출하면 어떤 불일치가 생기는가?
+- 주문 저장과 후속 이벤트 발행을 함께 잃지 않으려면 Outbox는 어떻게 구성해야 하는가?
+- 중복 전달된 이벤트를 소비자가 한 번의 효과로 처리하려면 Inbox는 어디에 기록해야 하는가?
 
 ## 실험 계획
 
@@ -224,3 +226,32 @@ Spring의 기본 롤백 규칙에서 runtime exception과 checked exception은 �
 - HTTP 4xx라고 항상 결제 실패는 아니다. 현재 예제는 `REJECT_CARD_PAYMENT`처럼 확정적인 카드 거절만 `PAYMENT_FAILED`로 기록한다. 인증·요청 형식·알 수 없는 결제 상태는 `PAYMENT_UNKNOWN`으로 남겨 조회·웹훅·운영 확인 대상이 된다.
 - WireMock 계약 테스트는 Basic 인증, 요청 본문, 멱등 키, `DONE`·`CANCELED` 응답, `404` 조회, 4xx·5xx 오류 매핑을 실제 HTTP 요청으로 검증한다.
 - 테스트 로그에서 PG 호출 시 `transactionActiveDuringConfirm=false`인지, 거절은 `PAYMENT_FAILED`인지, 타임아웃은 `PAYMENT_UNKNOWN -> PAID`로 재조정되는지 확인한다.
+
+## 8. Outbox And Inbox
+
+### 학습 질문
+
+주문이 커밋된 뒤 이벤트 발행 전에 프로세스가 종료되거나, 이벤트 전송 뒤 발행 완료 기록 전에 실패하면 어떻게 복구해야 하는가? 중복 이벤트가 와도 감사 로그를 한 번만 남기려면 무엇을 같은 트랜잭션으로 묶어야 하는가?
+
+### 코드 위치
+
+- 주문과 Outbox 원자 저장: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/outbox/OrderOutboxService.kt`
+- Outbox 상태 모델: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/outbox/OutboxEvent.kt`
+- 재발행 릴레이: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/outbox/OutboxRelay.kt`
+- Inbox 기반 감사 로그 소비: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/outbox/AuditLogEventConsumer.kt`
+- 테스트: `apps/transaction/src/test/kotlin/com/jihyeong/study/transaction/outbox/OutboxInboxTransactionTests.kt`
+
+### 재현 시나리오
+
+1. `OrderOutboxService`는 주문과 `PENDING` Outbox 이벤트를 같은 로컬 트랜잭션에서 저장한다. 이후 외부 트랜잭션이 롤백되면 주문과 이벤트 모두 사라진다.
+2. `OutboxRelay`는 `PENDING` 이벤트를 발행한 뒤에만 `PUBLISHED`로 기록한다. 전송 성공 후 완료 기록에 실패하면 이벤트는 `PENDING`으로 남고, 다음 릴레이가 같은 `eventId`를 다시 전송한다.
+3. 소비자는 Inbox의 `eventId` 유니크 제약을 먼저 확보하고 감사 로그를 같은 새 트랜잭션에서 저장한다. 중복 전달은 유니크 제약 위반으로 감지해 이미 처리한 이벤트로 종료한다.
+
+### 복기 포인트
+
+- Outbox는 주문 데이터와 이벤트 기록의 원자성을 보장한다. 메시지 브로커까지 하나의 DB 트랜잭션에 넣는 장치는 아니다.
+- 전송 후 `PUBLISHED` 기록 방식은 전송과 기록 사이 실패에서 중복 전송을 허용한다. 대신 유실보다 중복을 선택하는 at-least-once 발행 모델이다.
+- Inbox만 먼저 커밋하고 감사 로그를 나중에 저장하면, 중간 실패 시 이벤트가 처리된 것으로만 남아 감사 로그가 영구 유실된다. Inbox와 실제 효과를 같은 트랜잭션으로 묶어야 한다.
+- 이 예제의 소비 효과는 `eventId` 기준 effectively-once다. 네트워크와 브로커까지 포함한 end-to-end exactly-once를 보장하지는 않는다.
+- `aggregateVersion`은 같은 주문 단위의 순서 검증을 위한 데이터로 함께 저장한다. 순서 역전과 버전 공백을 보류·재시도하는 처리는 다음 학습 주제로 남겨 둔다.
+- 테스트 로그에서 첫 번째 릴레이가 전송 뒤 실패해 `PENDING`으로 남고, 두 번째 릴레이가 같은 이벤트를 재전송한 다음 Inbox가 중복 소비를 막는 순서를 확인한다.
