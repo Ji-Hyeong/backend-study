@@ -255,3 +255,32 @@ Spring의 기본 롤백 규칙에서 runtime exception과 checked exception은 �
 - 이 예제의 소비 효과는 `eventId` 기준 effectively-once다. 네트워크와 브로커까지 포함한 end-to-end exactly-once를 보장하지는 않는다.
 - `aggregateVersion`은 같은 주문 단위의 순서 검증을 위한 데이터로 함께 저장한다. 순서 역전과 버전 공백을 보류·재시도하는 처리는 다음 학습 주제로 남겨 둔다.
 - 테스트 로그에서 첫 번째 릴레이가 전송 뒤 실패해 `PENDING`으로 남고, 두 번째 릴레이가 같은 이벤트를 재전송한 다음 Inbox가 중복 소비를 막는 순서를 확인한다.
+
+## 9. Aggregate Event Ordering
+
+### 학습 질문
+
+같은 주문의 이벤트 `version=2`가 `version=1`보다 먼저 도착하면 왜 즉시 처리하면 안 되는가? 버전 공백을 보류하고 재전달할 때 Inbox와 감사 로그는 어떤 상태여야 하는가?
+
+### 코드 위치
+
+- aggregate별 처리 커서: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/outbox/AggregateEventCursor.kt`
+- 잠금 조회 저장소: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/outbox/AggregateEventCursorRepository.kt`
+- 소비 결과와 버전 판단: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/outbox/AuditLogEventConsumer.kt`
+- 테스트: `apps/transaction/src/test/kotlin/com/jihyeong/study/transaction/outbox/OutboxInboxTransactionTests.kt`
+
+### 재현 시나리오
+
+1. 소비자는 aggregate별 마지막 처리 버전을 `AggregateEventCursor`에 기록한다. 새 aggregate는 `version=1`부터 처리할 수 있다.
+2. `version=2`가 먼저 오면 기대 버전은 `1`이다. `EventSequenceGapException`으로 소비 트랜잭션을 롤백하고 `DEFERRED`를 반환하므로 Inbox, 커서, 감사 로그 어느 것도 남지 않는다.
+3. `version=1`을 처리하면 커서가 `1`이 된다. 같은 `version=2`를 재전달하면 기대 버전과 일치해 커서와 감사 로그가 함께 커밋된다.
+4. 이미 처리한 버전보다 작은 이벤트가 다른 `eventId`로 늦게 오면 `IGNORED_STALE`로 종료한다. 재반복을 막기 위해 Inbox에는 기록하지만 감사 로그와 커서는 바꾸지 않는다.
+
+### 복기 포인트
+
+- Inbox의 `eventId` 유니크 제약은 동일 이벤트 중복만 막는다. 이벤트 ID가 다른 순서 역전은 aggregate 버전 커서가 별도로 판단해야 한다.
+- 공백 이벤트를 성공 ACK하면 이전 버전이 영구 유실됐을 때 순서가 깨진 채 남는다. 이 예제는 `DEFERRED`를 브로커 NACK 또는 재시도 예약으로 연결하는 것을 전제로 한다.
+- 커서 전진, Inbox 저장, 감사 로그 저장을 같은 트랜잭션으로 묶어야 한다. 버전만 전진하고 실제 효과가 실패한 상태를 막는다.
+- 기존 커서는 비관적 락으로 직렬화한다. 실제 다중 소비자 환경에서는 같은 `aggregateId`를 브로커 파티션 키로 사용하고, 새 커서 생성 경쟁까지 포함한 DB 제약 오류 재시도 정책을 추가로 설계해야 한다.
+- 순서 보장은 aggregate 단위다. 서로 다른 aggregate 간 전역 순서를 강제하면 처리량과 복구 난이도만 높아지는 경우가 많다.
+- 테스트 로그에서 `v2` 보류 시 모든 기록이 `0`인지, `v1 -> v2` 재시도 뒤 커서가 `2`인지, 늦은 `v1`이 감사 로그를 늘리지 않는지 확인한다.

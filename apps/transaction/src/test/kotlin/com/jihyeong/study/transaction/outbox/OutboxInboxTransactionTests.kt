@@ -23,6 +23,7 @@ class OutboxInboxTransactionTests @Autowired constructor(
 	private val studyOrderRepository: StudyOrderRepository,
 	private val outboxEventRepository: OutboxEventRepository,
 	private val inboxEventRepository: InboxEventRepository,
+	private val aggregateEventCursorRepository: AggregateEventCursorRepository,
 	private val auditLogRepository: AuditLogRepository,
 	private val eventPublisher: CapturingStudyEventPublisher,
 	private val publicationStore: ControllableOutboxPublicationStore,
@@ -33,6 +34,7 @@ class OutboxInboxTransactionTests @Autowired constructor(
 	fun setUp() {
 		auditLogRepository.deleteAll()
 		inboxEventRepository.deleteAll()
+		aggregateEventCursorRepository.deleteAll()
 		outboxEventRepository.deleteAll()
 		studyOrderRepository.deleteAll()
 		eventPublisher.clear()
@@ -80,10 +82,42 @@ class OutboxInboxTransactionTests @Autowired constructor(
 
 		step(3, "동일 이벤트를 두 번 소비해도 Inbox 유니크 키와 같은 트랜잭션의 감사 로그는 한 번만 남긴다.")
 		val message = eventPublisher.publishedMessages.first()
-		assertThat(auditLogEventConsumer.consume(message)).isTrue()
-		assertThat(auditLogEventConsumer.consume(message)).isFalse()
+		assertThat(auditLogEventConsumer.consume(message)).isEqualTo(EventConsumeResult.PROCESSED)
+		assertThat(auditLogEventConsumer.consume(message)).isEqualTo(EventConsumeResult.DUPLICATE)
 		state("inboxEvents={}, auditLogs={}", inboxEventRepository.count(), auditLogRepository.count())
 		assertThat(inboxEventRepository.count()).isEqualTo(1)
 		assertThat(auditLogRepository.count()).isEqualTo(1)
+	}
+
+	@Test
+	fun `같은 aggregate의 다음 버전이 먼저 도착하면 보류하고 이전 버전 처리 뒤 재시도한다`() {
+		scenario("Outbox Ordering: version 2가 먼저 오면 ACK하지 않고 version 1 뒤에 재시도한다")
+		val versionOne = StudyEventMessage("event-v1", "order-100", 1, StudyEventType.ORDER_CREATED, "first")
+		val versionTwo = StudyEventMessage("event-v2", "order-100", 2, StudyEventType.ORDER_CREATED, "second")
+
+		step(1, "같은 주문의 version 2 이벤트가 version 1보다 먼저 소비자에 도착한다.")
+		assertThat(auditLogEventConsumer.consume(versionTwo)).isEqualTo(EventConsumeResult.DEFERRED)
+		state("inboxEvents={}, cursors={}, auditLogs={}", inboxEventRepository.count(), aggregateEventCursorRepository.count(), auditLogRepository.count())
+		assertThat(inboxEventRepository.count()).isZero()
+		assertThat(aggregateEventCursorRepository.count()).isZero()
+		assertThat(auditLogRepository.count()).isZero()
+
+		step(2, "공백을 채우는 version 1을 먼저 처리해 aggregate 커서를 version 1로 전진시킨다.")
+		assertThat(auditLogEventConsumer.consume(versionOne)).isEqualTo(EventConsumeResult.PROCESSED)
+		state("lastProcessedVersion={}", requireNotNull(aggregateEventCursorRepository.findByAggregateId("order-100")).lastProcessedVersion)
+
+		step(3, "보류했던 version 2를 재전달하면 이제 순서가 맞아 처리된다.")
+		assertThat(auditLogEventConsumer.consume(versionTwo)).isEqualTo(EventConsumeResult.PROCESSED)
+		state("lastProcessedVersion={}, inboxEvents={}, auditLogs={}", requireNotNull(aggregateEventCursorRepository.findByAggregateId("order-100")).lastProcessedVersion, inboxEventRepository.count(), auditLogRepository.count())
+		assertThat(requireNotNull(aggregateEventCursorRepository.findByAggregateId("order-100")).lastProcessedVersion).isEqualTo(2)
+		assertThat(inboxEventRepository.count()).isEqualTo(2)
+		assertThat(auditLogRepository.count()).isEqualTo(2)
+
+		step(4, "처리 완료된 version 1이 다른 eventId로 늦게 재전달돼도 효과 없이 Inbox에만 기록한다.")
+		val staleVersionOne = StudyEventMessage("event-v1-late", "order-100", 1, StudyEventType.ORDER_CREATED, "first-late")
+		assertThat(auditLogEventConsumer.consume(staleVersionOne)).isEqualTo(EventConsumeResult.IGNORED_STALE)
+		state("lastProcessedVersion={}, inboxEvents={}, auditLogs={}", requireNotNull(aggregateEventCursorRepository.findByAggregateId("order-100")).lastProcessedVersion, inboxEventRepository.count(), auditLogRepository.count())
+		assertThat(inboxEventRepository.count()).isEqualTo(3)
+		assertThat(auditLogRepository.count()).isEqualTo(2)
 	}
 }
