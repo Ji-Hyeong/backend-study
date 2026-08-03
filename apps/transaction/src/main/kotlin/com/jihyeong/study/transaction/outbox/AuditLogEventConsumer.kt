@@ -25,6 +25,7 @@ class EventSequenceGapException(
 @Service
 class AuditLogEventConsumer(
 	private val inboxAuditLogProcessor: InboxAuditLogProcessor,
+	private val inboxEventRepository: InboxEventRepository,
 ) {
 
 	/**
@@ -35,8 +36,7 @@ class AuditLogEventConsumer(
 		return try {
 			inboxAuditLogProcessor.process(message)
 		} catch (exception: DataIntegrityViolationException) {
-			log.info("중복 이벤트 소비 생략: eventId={}", message.eventId)
-			EventConsumeResult.DUPLICATE
+			resolveUniqueConstraint(message, exception)
 		} catch (exception: EventSequenceGapException) {
 			log.info(
 				"이벤트 순서 공백으로 재시도 대기: aggregateId={}, expectedVersion={}, actualVersion={}",
@@ -45,6 +45,17 @@ class AuditLogEventConsumer(
 				exception.actualVersion,
 			)
 			EventConsumeResult.DEFERRED
+		}
+	}
+
+	/** Inbox eventId가 없으면 최초 aggregate cursor 생성 경합일 수 있어 새 트랜잭션으로 한 번만 재시도한다. */
+	private fun resolveUniqueConstraint(message: StudyEventMessage, original: DataIntegrityViolationException): EventConsumeResult {
+		if (inboxEventRepository.existsByEventId(message.eventId)) return EventConsumeResult.DUPLICATE
+		return try {
+			log.info("최초 aggregate cursor 생성 경합 재시도: eventId={}, aggregateId={}", message.eventId, message.aggregateId)
+			inboxAuditLogProcessor.process(message)
+		} catch (retryException: DataIntegrityViolationException) {
+			if (inboxEventRepository.existsByEventId(message.eventId)) EventConsumeResult.DUPLICATE else throw original
 		}
 	}
 

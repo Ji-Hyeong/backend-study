@@ -329,3 +329,9 @@ STUDY_OUTBOX_KAFKA_ENABLED=true ./gradlew :apps:transaction:bootRun
 - 발행 또는 완료 기록 실패 시 현재 worker의 lease만 즉시 `PENDING`으로 반환한다. 브로커가 이미 받았을 수 있으므로 소비자 Inbox의 중복 방어는 계속 필요하다.
 - 프로세스 중단처럼 release 코드가 실행되지 않는 경우에는 lease 만료 뒤 다른 worker가 재claim한다.
 - 테스트 로그에서 worker-a 발행 뒤 worker-b가 같은 이벤트를 claim하지 못하는지 확인한다.
+
+## 12. First Cursor Creation Race
+
+- aggregate cursor가 아직 없으면 행 잠금으로 보호할 대상도 없다. 두 소비자가 동시에 `version=1`을 처리하면 aggregate ID 유니크 제약에서 한 트랜잭션이 롤백될 수 있다.
+- Inbox에 같은 eventId가 없으면 cursor 생성 경합으로 보고 새 트랜잭션에서 한 번 재시도한다. 성공한 cursor가 보이면 같은 version은 `IGNORED_STALE`로 끝난다.
+- 두 번째도 실패하고 Inbox 기록도 없다면 원래 예외를 전파한다. 무한 재시도로 DB 장애를 중복 처리로 오인하지 않는다.
