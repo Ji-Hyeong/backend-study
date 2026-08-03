@@ -90,6 +90,19 @@ class OutboxInboxTransactionTests @Autowired constructor(
 	}
 
 	@Test
+	fun `두 relay가 같은 이벤트를 조회해도 claim에 성공한 worker만 발행한다`() {
+		scenario("Outbox Lease: compare-and-set claim으로 다중 relay의 중복 발행을 막는다")
+		orderOutboxService.createOrder("ticket")
+
+		step(1, "worker-a가 PENDING 이벤트를 PUBLISHING으로 원자 전이하고 발행한다.")
+		assertThat(outboxRelay.relayPending("worker-a")).isEqualTo(1)
+		step(2, "worker-b는 이미 PUBLISHED인 같은 이벤트를 다시 claim하지 못한다.")
+		assertThat(outboxRelay.relayPending("worker-b")).isZero()
+		state("publishedMessages={}", eventPublisher.publishedMessages.map { it.eventId })
+		assertThat(eventPublisher.publishedMessages).hasSize(1)
+	}
+
+	@Test
 	fun `같은 aggregate의 다음 버전이 먼저 도착하면 보류하고 이전 버전 처리 뒤 재시도한다`() {
 		scenario("Outbox Ordering: version 2가 먼저 오면 ACK하지 않고 version 1 뒤에 재시도한다")
 		val versionOne = StudyEventMessage("event-v1", "order-100", 1, StudyEventType.ORDER_CREATED, "first")

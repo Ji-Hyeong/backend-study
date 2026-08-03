@@ -315,3 +315,17 @@ STUDY_OUTBOX_KAFKA_ENABLED=true ./gradlew :apps:transaction:bootRun
 - 이 동기 대기는 DB 트랜잭션 밖의 relay에서만 수행한다. 주문 저장 트랜잭션 안에서 Kafka ACK를 기다리는 구조가 아니다.
 - 현재 구현은 발행 어댑터와 메시지 키 계약까지 다룬다. 실제 소비자 listener의 ACK/NACK, 재시도 토픽, DLQ는 다음 단계에서 별도로 추가한다.
 - 테스트는 성공 시 topic·key·payload 전달, 실패 시 예외 전파를 확인한다. Kafka 컨테이너를 띄운 통합 테스트는 브로커 소비자와 함께 추가하는 것이 적절하다.
+
+## 11. Outbox Relay Lease
+
+### 학습 질문
+
+여러 relay 인스턴스가 같은 `PENDING` 이벤트를 읽을 때, 왜 단순 조회 뒤 발행하면 중복 전송되는가? 발행 권한은 어떻게 짧게 점유하고 장애 뒤에는 어떻게 회수해야 하는가?
+
+### 복기 포인트
+
+- relay는 후보 ID를 읽은 뒤 `PENDING` 또는 lease가 만료된 `PUBLISHING` 행만 compare-and-set update로 claim한다. 같은 행을 본 worker 중 update에 성공한 하나만 발행한다.
+- claim은 `PUBLISHING`, worker ID, 30초 lease 만료 시각, 시도 횟수를 기록한다. 브로커 ACK 뒤 같은 worker만 `PUBLISHED`로 전이할 수 있다.
+- 발행 또는 완료 기록 실패 시 현재 worker의 lease만 즉시 `PENDING`으로 반환한다. 브로커가 이미 받았을 수 있으므로 소비자 Inbox의 중복 방어는 계속 필요하다.
+- 프로세스 중단처럼 release 코드가 실행되지 않는 경우에는 lease 만료 뒤 다른 worker가 재claim한다.
+- 테스트 로그에서 worker-a 발행 뒤 worker-b가 같은 이벤트를 claim하지 못하는지 확인한다.

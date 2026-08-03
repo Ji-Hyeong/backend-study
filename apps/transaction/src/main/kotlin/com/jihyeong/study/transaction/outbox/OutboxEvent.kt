@@ -13,6 +13,7 @@ import jakarta.persistence.Table
 
 enum class OutboxEventStatus {
 	PENDING,
+	PUBLISHING,
 	PUBLISHED,
 }
 
@@ -41,6 +42,12 @@ class OutboxEvent(
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	var status: OutboxEventStatus = OutboxEventStatus.PENDING,
+	@Column(name = "lease_owner")
+	var leaseOwner: String? = null,
+	@Column(name = "lease_expires_at")
+	var leaseExpiresAt: Instant? = null,
+	@Column(name = "publish_attempts", nullable = false)
+	var publishAttempts: Int = 0,
 	@Column(name = "published_at")
 	var publishedAt: Instant? = null,
 ) {
@@ -49,10 +56,12 @@ class OutboxEvent(
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	val id: Long? = null
 
-	fun markPublished(now: Instant) {
-		require(status == OutboxEventStatus.PENDING) { "이미 발행 완료된 Outbox 이벤트입니다: $eventId" }
+	fun markPublished(workerId: String, now: Instant) {
+		require(status == OutboxEventStatus.PUBLISHING && leaseOwner == workerId) { "발행 권한이 없는 Outbox 이벤트입니다: $eventId" }
 		status = OutboxEventStatus.PUBLISHED
 		publishedAt = now
+		leaseOwner = null
+		leaseExpiresAt = null
 	}
 
 	fun toMessage(): StudyEventMessage = StudyEventMessage(
