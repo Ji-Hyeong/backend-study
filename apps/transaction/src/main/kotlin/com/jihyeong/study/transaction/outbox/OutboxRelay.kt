@@ -1,6 +1,8 @@
 package com.jihyeong.study.transaction.outbox
 
 import java.time.Instant
+import java.time.Duration
+import java.util.UUID
 import java.util.concurrent.ExecutionException
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -62,7 +64,7 @@ class KafkaStudyEventPublisher(
 
 /** 브로커 전송과 완료 상태 저장 사이의 장애 창을 명시적으로 분리한 포트다. */
 interface OutboxPublicationStore {
-	fun markPublished(eventId: String)
+	fun markPublished(eventId: String, workerId: String)
 }
 
 @Component
@@ -71,10 +73,10 @@ class JpaOutboxPublicationStore(
 ) : OutboxPublicationStore {
 
 	@Transactional
-	override fun markPublished(eventId: String) {
+	override fun markPublished(eventId: String, workerId: String) {
 		val event = outboxEventRepository.findByEventId(eventId) ?: error("Outbox 이벤트를 찾을 수 없습니다: $eventId")
 		if (event.status == OutboxEventStatus.PUBLISHED) return
-		event.markPublished(Instant.now())
+		event.markPublished(workerId, Instant.now())
 		log.info("Outbox 발행 완료 기록 커밋 예정: eventId={}", eventId)
 	}
 
@@ -83,9 +85,35 @@ class JpaOutboxPublicationStore(
 	}
 }
 
+data class ClaimedOutboxEvent(val eventId: String, val message: StudyEventMessage)
+
+@Service
+class OutboxClaimService(
+	private val outboxEventRepository: OutboxEventRepository,
+) {
+	@Transactional
+	fun claim(workerId: String, limit: Int = 100): List<ClaimedOutboxEvent> {
+		val now = Instant.now()
+		val leaseExpiresAt = now.plus(LEASE_DURATION)
+		return outboxEventRepository.findClaimableIds(now, OutboxEventStatus.PENDING, OutboxEventStatus.PUBLISHING, org.springframework.data.domain.PageRequest.of(0, limit)).mapNotNull { id ->
+			if (outboxEventRepository.claim(id, workerId, now, leaseExpiresAt, OutboxEventStatus.PENDING, OutboxEventStatus.PUBLISHING) == 0) null
+			else outboxEventRepository.findById(id).orElseThrow().let { ClaimedOutboxEvent(it.eventId, it.toMessage()) }
+		}
+	}
+
+	@Transactional
+	fun release(eventId: String, workerId: String) {
+		outboxEventRepository.release(eventId, workerId, OutboxEventStatus.PENDING, OutboxEventStatus.PUBLISHING)
+	}
+
+	private companion object {
+		val LEASE_DURATION: Duration = Duration.ofSeconds(30)
+	}
+}
+
 @Service
 class OutboxRelay(
-	private val outboxEventRepository: OutboxEventRepository,
+	private val outboxClaimService: OutboxClaimService,
 	private val eventPublisher: StudyEventPublisher,
 	private val publicationStore: OutboxPublicationStore,
 ) {
@@ -94,13 +122,17 @@ class OutboxRelay(
 	 * 전송 성공 뒤 완료 기록 전에 중단되면 이벤트는 다시 발행된다. 이 메서드는 중복을 제거하지 않고
 	 * at-least-once 발행을 보장하며, 중복 방어는 소비자 Inbox가 담당한다.
 	 */
-	fun relayPending(): Int {
-		val events = outboxEventRepository.findAllByStatusOrderByIdAsc(OutboxEventStatus.PENDING)
+	fun relayPending(workerId: String = instanceWorkerId): Int {
+		val events = outboxClaimService.claim(workerId)
 		events.forEach { event ->
-			val message = event.toMessage()
-			log.info("Outbox 브로커 전송 시작: eventId={}", message.eventId)
-			eventPublisher.publish(message)
-			publicationStore.markPublished(message.eventId)
+			try {
+				log.info("Outbox 브로커 전송 시작: eventId={}, workerId={}", event.eventId, workerId)
+				eventPublisher.publish(event.message)
+				publicationStore.markPublished(event.eventId, workerId)
+			} catch (exception: RuntimeException) {
+				outboxClaimService.release(event.eventId, workerId)
+				throw exception
+			}
 		}
 		return events.size
 	}
@@ -108,4 +140,6 @@ class OutboxRelay(
 	private companion object {
 		val log = LoggerFactory.getLogger(OutboxRelay::class.java)
 	}
+
+	private val instanceWorkerId = "relay-${UUID.randomUUID()}"
 }

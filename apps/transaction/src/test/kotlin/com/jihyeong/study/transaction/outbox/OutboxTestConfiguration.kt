@@ -40,11 +40,11 @@ class ControllableOutboxPublicationStore(
 
 	var failNextMark: Boolean = false
 
-	override fun markPublished(eventId: String) {
+	override fun markPublished(eventId: String, workerId: String) {
 		if (failNextMark) {
 			failNextMark = false
 			throw IllegalStateException("브로커 전송 후 Outbox 완료 기록 실패")
 		}
-		delegate.markPublished(eventId)
+		delegate.markPublished(eventId, workerId)
 	}
 }
