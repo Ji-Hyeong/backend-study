@@ -284,3 +284,34 @@ Spring의 기본 롤백 규칙에서 runtime exception과 checked exception은 �
 - 기존 커서는 비관적 락으로 직렬화한다. 실제 다중 소비자 환경에서는 같은 `aggregateId`를 브로커 파티션 키로 사용하고, 새 커서 생성 경쟁까지 포함한 DB 제약 오류 재시도 정책을 추가로 설계해야 한다.
 - 순서 보장은 aggregate 단위다. 서로 다른 aggregate 간 전역 순서를 강제하면 처리량과 복구 난이도만 높아지는 경우가 많다.
 - 테스트 로그에서 `v2` 보류 시 모든 기록이 `0`인지, `v1 -> v2` 재시도 뒤 커서가 `2`인지, 늦은 `v1`이 감사 로그를 늘리지 않는지 확인한다.
+
+## 10. Kafka Outbox Publisher
+
+### 학습 질문
+
+Outbox 이벤트를 Kafka에 보낼 때 왜 `aggregateId`를 record key로 사용해야 하며, 브로커 ACK 전에는 왜 `PUBLISHED`로 표시하면 안 되는가?
+
+### 코드 위치
+
+- Kafka 발행 어댑터: `apps/transaction/src/main/kotlin/com/jihyeong/study/transaction/outbox/OutboxRelay.kt`
+- Kafka 의존성: `apps/transaction/build.gradle.kts`
+- Kafka 실행 환경: `docker/docker-compose.yml`
+- 설정: `apps/transaction/src/main/resources/application.yml`
+- 계약 테스트: `apps/transaction/src/test/kotlin/com/jihyeong/study/transaction/outbox/KafkaStudyEventPublisherTests.kt`
+
+### 실행 방법
+
+```bash
+docker compose -f docker/docker-compose.yml up -d kafka
+STUDY_OUTBOX_KAFKA_ENABLED=true ./gradlew :apps:transaction:bootRun
+```
+
+기본값은 `study.outbox.kafka.enabled=false`라서 로컬 로깅 발행기를 사용한다. Kafka를 사용할 때 `STUDY_KAFKA_BOOTSTRAP_SERVERS`로 브로커 주소를 바꾸고, `study.outbox.kafka.topic`으로 토픽 이름을 바꿀 수 있다.
+
+### 복기 포인트
+
+- `KafkaStudyEventPublisher`는 `aggregateId`를 Kafka record key로 보낸다. 같은 키는 같은 파티션에 기록되므로, 파티션 내부 순서와 aggregate 버전 커서가 함께 작동한다.
+- `KafkaTemplate.send(...).get()`으로 브로커 ACK를 받은 뒤에만 relay가 `PUBLISHED`를 기록한다. ACK 실패는 예외로 전파돼 Outbox가 `PENDING`으로 남고 재발행된다.
+- 이 동기 대기는 DB 트랜잭션 밖의 relay에서만 수행한다. 주문 저장 트랜잭션 안에서 Kafka ACK를 기다리는 구조가 아니다.
+- 현재 구현은 발행 어댑터와 메시지 키 계약까지 다룬다. 실제 소비자 listener의 ACK/NACK, 재시도 토픽, DLQ는 다음 단계에서 별도로 추가한다.
+- 테스트는 성공 시 topic·key·payload 전달, 실패 시 예외 전파를 확인한다. Kafka 컨테이너를 띄운 통합 테스트는 브로커 소비자와 함께 추가하는 것이 적절하다.

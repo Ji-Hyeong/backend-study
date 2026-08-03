@@ -1,7 +1,11 @@
 package com.jihyeong.study.transaction.outbox
 
 import java.time.Instant
+import java.util.concurrent.ExecutionException
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -16,6 +20,7 @@ interface StudyEventPublisher {
  * 발행 완료 표시는 브로커 호출 이후에 별도 트랜잭션으로 수행한다.
  */
 @Component
+@ConditionalOnProperty(name = ["study.outbox.kafka.enabled"], havingValue = "false", matchIfMissing = true)
 class LoggingStudyEventPublisher : StudyEventPublisher {
 
 	override fun publish(message: StudyEventMessage) {
@@ -24,6 +29,34 @@ class LoggingStudyEventPublisher : StudyEventPublisher {
 
 	private companion object {
 		val log = LoggerFactory.getLogger(LoggingStudyEventPublisher::class.java)
+	}
+}
+
+/**
+ * Kafka 발행 어댑터다. aggregateId를 record key로 사용해 같은 aggregate의 이벤트가 같은
+ * 파티션에 기록되도록 한다. relay는 브로커 ACK 이후에만 Outbox를 PUBLISHED로 전이한다.
+ */
+@Component
+@ConditionalOnProperty(name = ["study.outbox.kafka.enabled"], havingValue = "true")
+class KafkaStudyEventPublisher(
+	private val kafkaTemplate: KafkaTemplate<String, StudyEventMessage>,
+	@Value("\${study.outbox.kafka.topic}") private val topic: String,
+) : StudyEventPublisher {
+
+	override fun publish(message: StudyEventMessage) {
+		try {
+			kafkaTemplate.send(topic, message.aggregateId, message).get()
+			log.info("Kafka 브로커 ACK 수신: topic={}, eventId={}, aggregateId={}, version={}", topic, message.eventId, message.aggregateId, message.aggregateVersion)
+		} catch (exception: InterruptedException) {
+			Thread.currentThread().interrupt()
+			throw IllegalStateException("Kafka 발행 대기 중 인터럽트가 발생했습니다: eventId=${message.eventId}", exception)
+		} catch (exception: ExecutionException) {
+			throw IllegalStateException("Kafka 브로커 발행에 실패했습니다: eventId=${message.eventId}", exception.cause)
+		}
+	}
+
+	private companion object {
+		val log = LoggerFactory.getLogger(KafkaStudyEventPublisher::class.java)
 	}
 }
 
