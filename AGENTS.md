@@ -6,6 +6,7 @@
 - Keycloak 개발 realm은 `docker/keycloak/import/backend-study-realm.json`에서 관리합니다.
 
 ## 프로젝트 변경 이력
+- 2026-08-03: `transaction` Kafka 소비자 listener에 처리 결과별 ACK, 순서 공백 재시도, 반복 실패 DLT 전환과 단위 테스트를 추가.
 - 2026-08-03: `transaction` 소비자에 최초 aggregate cursor 유니크 제약 충돌을 event ID 중복과 구분하고, 새 트랜잭션 단일 재시도로 버전 판단을 복구하는 흐름을 추가.
 - 2026-08-03: `transaction` Outbox relay에 `PUBLISHING` lease와 compare-and-set claim을 추가해 다중 worker 중복 발행을 막고, lease 만료·실패 반환 기반 재시도 흐름을 테스트.
 - 2026-08-03: `transaction` Outbox 발행 포트에 Kafka 어댑터를 추가하고, aggregate ID record key·브로커 ACK 후 완료 기록·실패 전파 계약 테스트와 Docker Kafka 환경을 구성.

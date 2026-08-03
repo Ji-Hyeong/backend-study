@@ -335,3 +335,10 @@ STUDY_OUTBOX_KAFKA_ENABLED=true ./gradlew :apps:transaction:bootRun
 - aggregate cursor가 아직 없으면 행 잠금으로 보호할 대상도 없다. 두 소비자가 동시에 `version=1`을 처리하면 aggregate ID 유니크 제약에서 한 트랜잭션이 롤백될 수 있다.
 - Inbox에 같은 eventId가 없으면 cursor 생성 경합으로 보고 새 트랜잭션에서 한 번 재시도한다. 성공한 cursor가 보이면 같은 version은 `IGNORED_STALE`로 끝난다.
 - 두 번째도 실패하고 Inbox 기록도 없다면 원래 예외를 전파한다. 무한 재시도로 DB 장애를 중복 처리로 오인하지 않는다.
+
+## 13. Kafka Consumer Retry And DLT
+
+- Kafka listener는 `PROCESSED`, `DUPLICATE`, `IGNORED_STALE`를 정상 ACK한다. `DEFERRED`는 재시도 예외로 전환한다.
+- 소비 중 발생한 다른 예외도 숨기지 않고 Kafka 오류 처리기로 전파한다. 기본 오류 처리기는 재시도 후 DLT로 보낸다.
+- 기본 설정은 1초 간격으로 2회 재시도한다. 그래도 순서 공백이 해소되지 않으면 같은 파티션의 `transaction.study.events.DLT`로 전송한다.
+- DLT에는 원본 record key와 headers가 보존되므로 운영자는 aggregate ID와 event ID를 기준으로 누락된 이전 버전을 조사·재발행할 수 있다.

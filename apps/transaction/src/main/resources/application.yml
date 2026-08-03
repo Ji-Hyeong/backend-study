@@ -11,6 +11,13 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         spring.json.add.type.headers: false
+    consumer:
+      group-id: transaction-audit-log
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.value.default.type: com.jihyeong.study.transaction.outbox.StudyEventMessage
+        spring.json.trusted.packages: com.jihyeong.study.transaction.outbox
   datasource:
     url: jdbc:h2:mem:transaction_study;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: sa
@@ -29,6 +36,8 @@ study:
     kafka:
       enabled: false
       topic: transaction.study.events
+      retry-interval: 1s
+      retry-attempts: 2
   payment:
     toss:
       enabled: false
