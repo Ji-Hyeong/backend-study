@@ -1,6 +1,4 @@
-# Kotlin Backend Reliability Lab
-
-![Kotlin Backend Reliability Lab - failure scenarios, design choices, and verified tests](docs/assets/backend-study-social-preview.png)
+# Kotlin Backend Study
 
 [![CI](https://github.com/Ji-Hyeong/backend-study/actions/workflows/ci.yml/badge.svg)](https://github.com/Ji-Hyeong/backend-study/actions/workflows/ci.yml)
 
