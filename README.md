@@ -1,5 +1,7 @@
 # Kotlin Backend Reliability Lab
 
+![Kotlin Backend Reliability Lab - failure scenarios, design choices, and verified tests](docs/assets/backend-study-social-preview.png)
+
 [![CI](https://github.com/Ji-Hyeong/backend-study/actions/workflows/ci.yml/badge.svg)](https://github.com/Ji-Hyeong/backend-study/actions/workflows/ci.yml)
 
 운영 환경에서 발생하는 백엔드 실패를 코드와 테스트로 재현하고, 설계 선택의 효과와 한계를 검증하는 Kotlin/Spring Boot 모노레포입니다.
