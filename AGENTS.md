@@ -6,6 +6,7 @@
 - Keycloak 개발 realm은 `docker/keycloak/import/backend-study-realm.json`에서 관리합니다.
 
 ## 프로젝트 변경 이력
+- 2026-08-11: 저장소 목적과 핵심 모듈·인프라를 한눈에 보여주는 1280x640 대표 배너를 README 최상단에 추가.
 - 2026-08-11: 대표 README를 실패 시나리오·설계 선택·검증 근거 중심으로 재구성하고, 결제·Outbox/Inbox·동시성 다이어그램과 PostgreSQL Testcontainers 기반 통합 테스트를 추가.
 - 2026-08-03: `transaction` Kafka 소비자 listener에 처리 결과별 ACK, 순서 공백 재시도, 반복 실패 DLT 전환과 단위 테스트를 추가.
 - 2026-08-03: `transaction` 소비자에 최초 aggregate cursor 유니크 제약 충돌을 event ID 중복과 구분하고, 새 트랜잭션 단일 재시도로 버전 판단을 복구하는 흐름을 추가.
