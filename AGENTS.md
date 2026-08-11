@@ -6,6 +6,7 @@
 - Keycloak 개발 realm은 `docker/keycloak/import/backend-study-realm.json`에서 관리합니다.
 
 ## 프로젝트 변경 이력
+- 2026-08-12: README의 채용·시연 중심 표현을 줄이고 공부한 주제, 실행 방법, 정리 방식이 자연스럽게 드러나도록 학습·복습 저장소 소개로 개편.
 - 2026-08-11: 저장소 제목을 `Kotlin Backend Study`로 단순화하고 README 대표 배너를 제거해 첫 화면의 정보 밀도를 개선.
 - 2026-08-11: 저장소 목적과 핵심 모듈·인프라를 한눈에 보여주는 1280x640 대표 배너를 README 최상단에 추가.
 - 2026-08-11: 대표 README를 실패 시나리오·설계 선택·검증 근거 중심으로 재구성하고, 결제·Outbox/Inbox·동시성 다이어그램과 PostgreSQL Testcontainers 기반 통합 테스트를 추가.
