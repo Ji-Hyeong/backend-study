@@ -48,15 +48,15 @@ class IsolationTransactionTests @Autowired constructor(
 	}
 
 	@Test
-	fun `read uncommitted 는 다른 트랜잭션이 flush 후 아직 커밋하지 않은 행을 읽을 수 있다`() {
-		scenario("Isolation - READ_UNCOMMITTED dirty read")
+	fun `postgresql read uncommitted 는 read committed 로 동작해 커밋 전 행을 읽지 않는다`() {
+		scenario("Isolation - PostgreSQL READ_UNCOMMITTED dirty read 방지")
 		step(1, "writer 트랜잭션이 ticket 주문을 저장하고 flush 한 뒤 커밋하지 않은 상태로 대기한다.")
 		step(2, "reader 트랜잭션은 READ_UNCOMMITTED로 같은 productName을 조회한다.")
-		step(3, "reader 조회 후 writer는 예외로 롤백된다.")
+		step(3, "PostgreSQL은 READ_UNCOMMITTED를 READ_COMMITTED처럼 처리하므로 커밋 전 행은 보이지 않는다.")
 		val count = isolationStudyService.countUncommittedInsertWithReadUncommitted("ticket")
 		state("uncommittedCount={}", count)
 
-		assertThat(count).isEqualTo(1)
+		assertThat(count).isZero()
 		assertThat(orderRepository.count()).isZero()
 	}
 

@@ -6,9 +6,9 @@ import com.jihyeong.study.transaction.support.StudyStepLogger.scenario
 import com.jihyeong.study.transaction.support.StudyStepLogger.state
 import com.jihyeong.study.transaction.support.StudyStepLogger.step
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
@@ -46,7 +46,7 @@ class OutboxInboxTransactionTests @Autowired constructor(
 		scenario("Outbox Atomicity: 주문과 이벤트는 함께 커밋되거나 함께 롤백된다")
 		step(1, "외부 트랜잭션 안에서 주문과 ORDER_CREATED Outbox 이벤트를 저장한다.")
 
-		assertThrows<IllegalStateException> {
+		assertThrows(IllegalStateException::class.java) {
 			transactionTemplate.executeWithoutResult {
 				orderOutboxService.createOrder("ticket")
 				throw IllegalStateException("주문 후속 처리 실패")
@@ -66,7 +66,7 @@ class OutboxInboxTransactionTests @Autowired constructor(
 		publicationStore.failNextMark = true
 
 		step(1, "브로커 전송은 성공하지만 PUBLISHED 기록 전에 프로세스가 실패한다.")
-		assertThrows<IllegalStateException> {
+		assertThrows(IllegalStateException::class.java) {
 			outboxRelay.relayPending()
 		}
 		val pending = requireNotNull(outboxEventRepository.findByEventId(created.eventId))

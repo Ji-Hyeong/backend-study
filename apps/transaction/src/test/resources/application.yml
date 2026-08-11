@@ -1,15 +1,15 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:transaction_study;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
+    # JDBC Testcontainers starts an isolated PostgreSQL instance for the test JVM.
+    # This keeps transaction and locking semantics aligned with the documented database.
+    url: jdbc:tc:postgresql:16-alpine:///transaction_study
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: study
+    password: study
   jpa:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
-  h2:
-    console:
-      enabled: false
 
 logging:
   level:
