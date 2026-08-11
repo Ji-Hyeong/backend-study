@@ -1,8 +1,10 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:concurrency_study;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
+    # Lost-update and row-lock tests must use the same database semantics as production-like runs.
+    url: jdbc:tc:postgresql:16-alpine:///concurrency_study
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: study
+    password: study
     hikari:
       maximum-pool-size: 25
   jpa:

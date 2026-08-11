@@ -184,13 +184,13 @@ Spring의 기본 롤백 규칙에서 runtime exception과 checked exception은 �
 
 | 현상 | 비교 격리 수준 | 테스트 구성 | 관찰 결과 |
 | --- | --- | --- | --- |
-| Dirty Read | `READ_UNCOMMITTED` vs `READ_COMMITTED` | writer가 저장 후 flush만 하고 커밋 전 대기, reader가 count 조회 | `READ_UNCOMMITTED`는 `1`, `READ_COMMITTED`는 `0` |
+| Dirty Read | PostgreSQL의 `READ_UNCOMMITTED` vs `READ_COMMITTED` | writer가 저장 후 flush만 하고 커밋 전 대기, reader가 count 조회 | PostgreSQL은 두 격리 수준 모두 `0` |
 | Non-repeatable Read | `READ_COMMITTED` vs `REPEATABLE_READ` | 처음 `before` count 조회, 별도 트랜잭션이 `after`로 update 후 재조회 | `READ_COMMITTED`는 `1 -> 0`, `REPEATABLE_READ`는 `1 -> 1` |
 | Phantom Read | `READ_COMMITTED` vs `REPEATABLE_READ` | 처음 count 조회, 별도 트랜잭션이 새 행 insert 후 재조회 | `READ_COMMITTED`는 `0 -> 1`, `REPEATABLE_READ`는 `0 -> 0` |
 
 ### 복기 포인트
 
-- `READ_UNCOMMITTED`는 다른 트랜잭션이 아직 커밋하지 않은 변경도 읽을 수 있어 롤백될 데이터를 본다.
+- SQL 표준상 `READ_UNCOMMITTED`는 dirty read를 허용하지만 PostgreSQL은 이를 `READ_COMMITTED`처럼 처리하므로 커밋 전 변경을 읽지 않는다.
 - `READ_COMMITTED`는 다른 트랜잭션이 커밋한 데이터를 다음 조회에서 볼 수 있다.
 - `REPEATABLE_READ`는 트랜잭션 시작 시점의 조회 스냅샷을 유지해 같은 조건의 재조회 결과가 바뀌지 않도록 한다.
 - JPA 1차 캐시가 격리 수준 차이를 가릴 수 있으므로, 이 예제는 같은 엔티티 `findById` 반복 대신 count 쿼리로 관찰한다.
