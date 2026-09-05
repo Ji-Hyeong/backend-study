@@ -6,6 +6,7 @@
 - Keycloak 개발 realm은 `docker/keycloak/import/backend-study-realm.json`에서 관리합니다.
 
 ## 프로젝트 변경 이력
+- 2026-09-05: GitHub Actions의 Node 20 지원 종료 경고를 제거하도록 Checkout과 Java 설정 액션을 현재 안정 버전으로 갱신.
 - 2026-09-04: 공개 문서의 작업 목적이 학습과 재현에 집중되도록 프로젝트 변경 이력의 표현을 정리.
 - 2026-08-12: README를 공부한 주제, 실행 방법과 정리 방식이 자연스럽게 드러나는 학습·복습 저장소 소개로 개편.
 - 2026-08-11: 저장소 제목을 `Kotlin Backend Study`로 단순화하고 README 대표 배너를 제거해 첫 화면의 정보 밀도를 개선.
